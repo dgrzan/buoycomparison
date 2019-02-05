@@ -5,22 +5,70 @@ import numpy as np
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 
+#plots the measured tide relative to the expected tide for a particular gauge
+def plotgauge(tidedifference,minimumt=0,maximumt=0,fignumber=1):
+    t = range(0,len(tidedifference)*5,5)
+    minimumi = minimumt/5
+    if maximumt==0:
+        maximumi = len(tidedifference)/5
+    else:
+        maximumi = maximumt/5
+    plt.figure(fignumber)
+    plt.plot(t[minimumi:maximumi],tidedifference[minimumi:maximumi],"b")
+
+#plots tsunami squares data 
+def plotTS(timelist,levellist,tshift=0,fignumber=1):
+    adjtime = []
+    if tshift!=0:
+        for i in range(len(timelist)):
+            timelist[i] = timelist[i]+tshift
+    plt.figure(fignumber)
+    plt.plot(timelist,levellist,"g")
+    
+
+#finds latitude and longitude array index that has value closest to the gauge lat and lon
+def findlocation(latlist,lonlist,lat,lon):
+    difflat = float('inf')
+    difflon = float('inf')
+    diff = 0
+    latindex = 0
+    lonindex = 0
+    for i in range(len(latlist)):
+        diff = abs(lat-latlist[i])
+        if diff<difflat:
+            difflat = diff
+            latindex = i
+
+    for i in range(len(lonlist)):
+        diff = abs(lon-lonlist[i])
+        if diff<difflon:
+            difflon = diff
+            lonindex = i
+
+    return latindex, lonindex
+
+
 if __name__ == "__main__":
 
     #ADJUSTABLE PARAMETERS
-    gaugefilename = "/home/davidgrzan/Tsunami/Tohoku/NOWPHAS_Tsunami_data/2011TET801G.txt"
-    gaugelat = 38.2325
-    gaugelon = 141.6836
+    gaugefilename = "/home/davidgrzan/Tsunami/Tohoku/NOWPHAS_Tsunami_data/2011TET219T.txt"
+    TSfilename = "/home/davidgrzan/Tsunami/Tohoku/output/NorthernJapanEQ_dip5.nc"
+    #gaugelat = 38.2325 #for 801
+    #gaugelon = 141.6836 #for 801
+    gaugelat = 40.1922
+    gaugelon = 141.7966+0.2
     timeadjust = 141505
+    mintime = 0#141000
+    maxtime = 10000#143000
 
-    
+    #setting up array variables
     exptide = []     #astronomical tide level (expected tide with no influences except for gravitational bodies)
     tide = []     #measured tide level
     time = []
     date = []
     tidediff = []
 
-    #opening the Mid Miyagi (801) GPS dataset, off the coast of sendai
+    #opening the gauge file and setting lists
     with open(gaugefilename) as file:
         line = list(csv.reader(file, delimiter=","))
         for i in range(len(line)):
@@ -37,58 +85,23 @@ if __name__ == "__main__":
         tidediff.append(tide[i]-exptide[i])
                 
     #pulling Tsunami Squares data from the netCDF output file
-    simdata = Dataset("/home/davidgrzan/Tsunami/Tohoku/output/TohokuEQ_dip5.nc", "r", format="NETCDF4")
+    simdata = Dataset(TSfilename, "r", format="NETCDF4")
     simtime = np.array(simdata.variables['time'])
     simlevel = np.array(simdata.variables['level'])
     simheight = np.array(simdata.variables['height'])
     simaltitude = np.array(simdata.variables['altitude'])
     simlatitude = np.array(simdata.variables['latitude'])
     simlongitude = np.array(simdata.variables['longitude'])
-    
-    #finding latitude and longitude array index that has value closest to the gauge lat and lon
-    difflat = float('inf')
-    difflon = float('inf')
-    diff = 0
-    latindex = 0
-    lonindex = 0
-    for i in range(len(simlatitude)):
-        diff = abs(gaugelat-simlatitude[i])
-        if diff<difflat:
-            difflat = diff
-            latindex = i
 
-    for i in range(len(simlongitude)):
-        diff = abs(gaugelon-simlongitude[i])
-        if diff<difflon:
-            difflon = diff
-            lonindex = i
+    #finds lat and lon in lists that are closest to gauge location
+    latindex, lonindex = findlocation(simlatitude,simlongitude,gaugelat,gaugelon)
 
-    print difflat
-    print difflon
-    print latindex
-    print lonindex
-    print simlatitude[latindex]
-    print simlongitude[lonindex]
-    print len(simlevel[:,0,0])
-    print len(simtime)
-    print len(simaltitude)
-
-    #shifting TS time data over to match gauge time
-    adjsimtime = []
-    for i in range(len(simtime)):
-        adjsimtime.append(simtime[i]+timeadjust)
-        
-    minr = 141000/5
-    maxr = 143000/5
-    t = range(0,len(date)*5,5)
-    plt.figure(1)
-    plt.plot(t[minr:maxr],tidediff[minr:maxr],"b")
-    plt.plot(adjsimtime,simlevel[:,latindex,lonindex],"g")
-
-    plt.figure(2)
-    plt.plot(adjsimtime,simlevel[:,latindex,lonindex],"g")
-
+    #plotting
+    plotgauge(tidediff,minimumt=mintime,maximumt=maxtime,fignumber=1)
+    plotTS(simtime,simlevel[:,latindex,lonindex],tshift=0,fignumber=2)
     plt.show()
+    
+
     
     
     
